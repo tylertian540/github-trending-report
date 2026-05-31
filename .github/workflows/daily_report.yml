@@ -1,0 +1,52 @@
+name: 每日 GitHub Trending 报告
+
+on:
+  schedule:
+    # 每天 00:00 UTC = 北京时间 08:00（CST = UTC+8）
+    - cron: '0 0 * * *'
+  # 允许手动触发（在 GitHub Actions 页面点 Run workflow）
+  workflow_dispatch:
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # 1. 检出代码
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      # 2. 配置 Python 环境
+      - name: 配置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 3. 安装依赖
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      # 4. 运行 GitHub Trending 分析
+      - name: 抓取 GitHub Trending 并生成报告
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: python github_trending_analyzer.py
+
+      # 5. 发送邮件报告
+      - name: 发送报告邮件
+        env:
+          SMTP_USER:     ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TO_EMAIL:      ${{ secrets.TO_EMAIL }}
+          APIKEY_FUN_KEY: ${{ secrets.APIKEY_FUN_KEY }}
+        run: python send_report_email.py
+
+      # 6. 上传报告文件（可在 Actions 页面下载）
+      - name: 上传报告为 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-trending-report-${{ github.run_number }}
+          path: reports/
+          retention-days: 30
